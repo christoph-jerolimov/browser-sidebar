@@ -61,6 +61,53 @@
     return el('span', { class: `badge ${variant || ''}` }, text);
   }
 
+  const TYPE_VARIANTS = [
+    [/bug|defect/i, 't-red'],
+    [/story/i, 't-green'],
+    [/epic/i, 't-purple'],
+    [/sub-?task/i, 't-teal'],
+    [/task/i, 't-blue'],
+    [/improvement|enhancement|feature/i, 't-cyan'],
+  ];
+
+  const PRIORITY_VARIANTS = [
+    [/blocker|highest|urgent/i, 'p-crit'],
+    [/critical/i, 'p-crit'],
+    [/high|major/i, 'p-high'],
+    [/medium|normal/i, 'p-med'],
+    [/lowest|trivial/i, 'p-min'],
+    [/low|minor/i, 'p-low'],
+  ];
+
+  function variantFor(name, table, fallback) {
+    for (const [re, variant] of table) {
+      if (re.test(name)) return variant;
+    }
+    return fallback;
+  }
+
+  function typeBadge(name) {
+    if (!name) return null;
+    return badge(name, variantFor(name, TYPE_VARIANTS, 't-gray'));
+  }
+
+  function priorityBadge(name) {
+    if (!name) return null;
+    return badge(name, variantFor(name, PRIORITY_VARIANTS, 'p-med'));
+  }
+
+  // GitHub label colors come from the API as hex; pick black/white text by luminance
+  function coloredLabelChip(name, hex) {
+    const chip = el('span', { class: 'label-chip' }, name);
+    if (/^[0-9a-f]{6}$/i.test(hex || '')) {
+      const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+      chip.style.background = `#${hex}`;
+      chip.style.borderColor = 'transparent';
+      chip.style.color = 0.299 * r + 0.587 * g + 0.114 * b > 140 ? '#1f2328' : '#ffffff';
+    }
+    return chip;
+  }
+
   function openLink(url, label) {
     return el('a', { class: 'open-link', href: url, target: '_blank', rel: 'noreferrer' },
       label || url);
@@ -132,11 +179,13 @@
       const fields = issue.fields || {};
       const statusName = fields.status?.name || '';
       head.append(badge(statusName || 'unknown', statusName.toLowerCase().replace(/\s+/g, '-')));
+      const tBadge = typeBadge(fields.issuetype?.name);
+      const pBadge = priorityBadge(fields.priority?.name);
+      if (tBadge) head.append(tBadge);
+      if (pBadge) head.append(pBadge);
       children.push(
         el('h2', {}, fields.summary || '(no summary)'),
         metaList([
-          ['Type', fields.issuetype?.name],
-          ['Priority', fields.priority?.name],
           ['Assignee', fields.assignee?.displayName || 'Unassigned'],
           ['Reporter', fields.reporter?.displayName],
           ['Updated', fmtDate(fields.updated)],
@@ -171,11 +220,15 @@
         else if (pull.draft && state === 'open') { state = 'draft'; variant = ''; }
       }
       head.append(badge(state, variant));
-      head.append(el('span', {}, pull || issue?.pull_request ? 'Pull request' : 'Issue'));
+      head.append(
+        pull || issue?.pull_request
+          ? badge('Pull request', 't-purple')
+          : badge('Issue', 't-teal')
+      );
 
       const labels = (data.labels || [])
-        .map((l) => (typeof l === 'string' ? l : l.name))
-        .filter(Boolean);
+        .map((l) => (typeof l === 'string' ? { name: l } : l))
+        .filter((l) => l.name);
 
       children.push(
         el('h2', {}, data.title || '(no title)'),
@@ -187,7 +240,7 @@
           ['Updated', fmtDate(data.updated_at)],
         ]),
         labels.length
-          ? el('div', { class: 'labels' }, labels.map((l) => el('span', { class: 'label-chip' }, l)))
+          ? el('div', { class: 'labels' }, labels.map((l) => coloredLabelChip(l.name, l.color)))
           : null,
         snippet(data.body || '')
       );
