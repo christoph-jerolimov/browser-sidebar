@@ -215,6 +215,34 @@ code {
   overflow-y: auto;
 }
 
+.activity {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.activity-title {
+  font-weight: 600;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.activity-meta {
+  margin: 4px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.activity-body.snippet {
+  margin-top: 4px;
+  padding-top: 0;
+  border-top: none;
+}
+
+.activity-body .badge { background: var(--badge-neutral); }
+
 .error {
   margin-top: 8px;
   color: var(--badge-closed);

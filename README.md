@@ -33,6 +33,9 @@ If you edit a shared file, copy it to the other folder too.
   (Jira: `/rest/api/2/issue/KEY`, GitHub: `api.github.com`), and renders a
   card with title, status, assignee, labels, etc., plus a link to open the
   original page in a tab.
+- Each card also shows the newest activity: the latest comment (Jira and
+  GitHub), or — for Jira — the latest status transition from the changelog
+  if that is more recent than the last comment.
 - Fetched tickets are cached (last 50, in extension storage): revisiting a
   ticket renders the latest known information instantly, while a fresh fetch
   runs in the background and updates the card only if something changed
