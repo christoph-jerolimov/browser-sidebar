@@ -160,6 +160,22 @@ code {
 .badge.closed { background: var(--badge-closed); }
 .badge.merged, .badge.done, .badge.resolved { background: var(--badge-merged); }
 
+/* Issue type colors (Bug, Task, Story, Epic, ...) */
+.badge.t-red { background: #cf222e; }
+.badge.t-blue { background: #0969da; }
+.badge.t-green { background: #1a7f37; }
+.badge.t-purple { background: #8250df; }
+.badge.t-teal { background: #1b7c83; }
+.badge.t-cyan { background: #0e7490; }
+.badge.t-gray { background: var(--badge-neutral); }
+
+/* Priority colors (Blocker/Highest ... Trivial/Lowest) */
+.badge.p-crit { background: #a40e26; }
+.badge.p-high { background: #bc4c00; }
+.badge.p-med { background: #9a6700; }
+.badge.p-low { background: #1a7f37; }
+.badge.p-min { background: var(--badge-neutral); }
+
 .card h2 {
   margin: 4px 0 10px;
   font-size: 17px;
