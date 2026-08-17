@@ -8,10 +8,11 @@
   'use strict';
 
   const api = globalThis.browser ?? globalThis.chrome;
-  const { findMatch } = globalThis.__sidebarMatcher;
+  const { findAllMatches } = globalThis.__sidebarMatcher;
 
   const cardEl = document.getElementById('card');
   const statusEl = document.getElementById('status');
+  const altsEl = document.getElementById('alts');
   const toggleBtn = document.getElementById('follow-toggle');
   const pausedBanner = document.getElementById('paused-banner');
   const tryForm = document.getElementById('try-form');
@@ -19,7 +20,8 @@
 
   let config = null;
   let following = true;
-  let currentRaw = null;
+  let currentSignature = null;
+  let currentAlternates = [];
   let requestSeq = 0;
 
   /* ---------- tiny DOM helpers (no innerHTML with remote data) ---------- */
@@ -258,23 +260,56 @@
 
   /* ----------------------------- match entry ----------------------------- */
 
-  function handleMatch(match, { force = false } = {}) {
-    if (!match) return;
+  function allowedByProjectFilter(match) {
+    if (match.kind !== 'jira') return true;
+    const allowed = config?.jira?.projectKeys || [];
+    return !allowed.length || allowed.includes(match.project);
+  }
 
-    if (match.kind === 'jira') {
-      const allowed = config?.jira?.projectKeys || [];
-      if (allowed.length && !allowed.includes(match.project)) return;
+  function renderAlternates(activeRaw) {
+    altsEl.replaceChildren();
+    const others = currentAlternates.filter((m) => allowedByProjectFilter(m));
+    altsEl.hidden = !others.length;
+    if (!others.length) return;
+    altsEl.append('Also detected: ');
+    for (const alt of others) {
+      const chip = el(
+        'button',
+        { class: `alt-chip${alt.raw === activeRaw ? ' active' : ''}`, type: 'button' },
+        alt.raw
+      );
+      chip.addEventListener('click', () => showMatch(alt));
+      altsEl.append(chip);
     }
+  }
 
-    if (!force && match.raw === currentRaw) return;
-    currentRaw = match.raw;
-
+  function showMatch(match) {
     const seq = ++requestSeq;
     setStatus(`Detected ${match.raw}${match.at ? ` · ${new Date(match.at).toLocaleTimeString()}` : ''}`);
+    renderAlternates(match.raw);
 
     if (match.kind === 'jira') showJira(match, seq);
     else if (match.kind === 'github') showGithub(match, seq);
     else renderUrl(match);
+  }
+
+  function handleMatch(match, { force = false } = {}) {
+    if (!match) return;
+
+    const alternates = (match.alternates || []).filter((m) => allowedByProjectFilter(m));
+    let primary = match;
+    if (!allowedByProjectFilter(primary)) {
+      // Fall back to the first alternate that passes the project filter
+      primary = alternates.shift();
+      if (!primary) return;
+    }
+
+    const signature = [primary, ...alternates].map((m) => m.raw).join('|');
+    if (!force && signature === currentSignature) return;
+    currentSignature = signature;
+    currentAlternates = alternates;
+
+    showMatch({ ...primary, at: primary.at ?? match.at });
   }
 
   /* -------------------------------- init --------------------------------- */
@@ -309,9 +344,13 @@
 
     tryForm.addEventListener('submit', (event) => {
       event.preventDefault();
-      const match = findMatch(tryInput.value.trim());
-      if (match) handleMatch(match, { force: true });
-      else setStatus('No Jira key, GitHub reference, or URL found in input.');
+      const [primary, ...rest] = findAllMatches(tryInput.value.trim());
+      if (primary) {
+        const alternates = rest.filter((m) => m.kind === 'jira' || m.kind === 'github');
+        handleMatch({ ...primary, alternates }, { force: true });
+      } else {
+        setStatus('No Jira key, GitHub reference, or URL found in input.');
+      }
     });
   }
 
