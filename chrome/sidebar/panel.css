@@ -30,7 +30,7 @@
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-size: 13px;
+  font-size: 15px;
   background: var(--bg);
   color: var(--fg);
   display: flex;
@@ -43,13 +43,13 @@ header {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--border);
 }
 
 header h1 {
   margin: 0;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 600;
 }
 
@@ -58,8 +58,8 @@ header h1 {
   background: transparent;
   color: var(--fg);
   border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 12px;
+  padding: 6px 12px;
+  font-size: 14px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -67,21 +67,22 @@ header h1 {
 #follow-toggle:hover { border-color: var(--accent); }
 
 #paused-banner {
-  padding: 6px 12px;
-  font-size: 12px;
+  padding: 8px 14px;
+  font-size: 14px;
   background: var(--banner-bg);
   border-bottom: 1px solid var(--banner-border);
 }
 
 #status {
-  padding: 4px 12px;
-  font-size: 11px;
+  padding: 6px 14px;
+  font-size: 13px;
   color: var(--muted);
-  min-height: 20px;
+  min-height: 24px;
 }
 
 #alts {
-  padding: 0 12px 6px;
+  padding: 0 14px 8px;
+  font-size: 13px;
 }
 
 .alt-chip {
@@ -89,10 +90,10 @@ header h1 {
   border: 1px solid var(--border);
   background: transparent;
   color: var(--fg);
-  border-radius: 10px;
-  padding: 1px 8px;
-  margin: 0 4px 4px 0;
-  font-size: 11px;
+  border-radius: 12px;
+  padding: 3px 10px;
+  margin: 0 5px 5px 0;
+  font-size: 13px;
   font-family: inherit;
   cursor: pointer;
 }
@@ -107,7 +108,7 @@ header h1 {
 
 main {
   flex: 1;
-  padding: 4px 12px 12px;
+  padding: 6px 14px 14px;
   overflow-y: auto;
 }
 
@@ -124,8 +125,8 @@ code {
 
 .card {
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: 10px;
+  padding: 14px;
 }
 
 .card .card-head {
@@ -146,9 +147,9 @@ code {
 
 .badge {
   display: inline-block;
-  padding: 1px 8px;
-  border-radius: 10px;
-  font-size: 11px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #fff;
   background: var(--badge-neutral);
@@ -160,8 +161,8 @@ code {
 .badge.merged, .badge.done, .badge.resolved { background: var(--badge-merged); }
 
 .card h2 {
-  margin: 2px 0 8px;
-  font-size: 14px;
+  margin: 4px 0 10px;
+  font-size: 17px;
   line-height: 1.35;
   font-weight: 600;
 }
@@ -169,8 +170,8 @@ code {
 .meta {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 2px 10px;
-  margin: 8px 0;
+  gap: 4px 12px;
+  margin: 10px 0;
 }
 
 .meta dt { color: var(--muted); }
@@ -181,10 +182,10 @@ code {
 .label-chip {
   display: inline-block;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0 7px;
-  margin: 0 4px 4px 0;
-  font-size: 11px;
+  border-radius: 12px;
+  padding: 2px 9px;
+  margin: 0 5px 5px 0;
+  font-size: 13px;
 }
 
 .snippet {
@@ -194,14 +195,14 @@ code {
   color: var(--muted);
   white-space: pre-wrap;
   word-break: break-word;
-  max-height: 180px;
+  max-height: 220px;
   overflow-y: auto;
 }
 
 .error {
   margin-top: 8px;
   color: var(--badge-closed);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .open-link {
@@ -216,7 +217,7 @@ code {
 
 footer {
   border-top: 1px solid var(--border);
-  padding: 8px 12px;
+  padding: 10px 14px;
 }
 
 #try-form {
@@ -230,8 +231,8 @@ footer {
   border-radius: 6px;
   background: transparent;
   color: var(--fg);
-  padding: 4px 8px;
-  font-size: 12px;
+  padding: 6px 10px;
+  font-size: 14px;
 }
 
 #try-form button {
@@ -239,6 +240,7 @@ footer {
   background: transparent;
   color: var(--fg);
   border-radius: 6px;
-  padding: 4px 10px;
+  padding: 6px 12px;
+  font-size: 14px;
   cursor: pointer;
 }
