@@ -167,7 +167,30 @@
 
   /* ------------------------------ renderers ------------------------------ */
 
-  function renderJira(match, issue, error) {
+  // activity: { type: 'comment'|'status', author, at, body?, from?, to? }
+  function activitySection(activity) {
+    if (!activity) return null;
+    const isStatus = activity.type === 'status';
+    const children = [
+      el('div', { class: 'activity-title' }, isStatus ? 'Latest status update' : 'Latest comment'),
+      el('div', { class: 'activity-meta' },
+        [activity.author, fmtDate(activity.at)].filter(Boolean).join(' · ')),
+    ];
+    if (isStatus) {
+      children.push(el('div', { class: 'activity-body' }, [
+        badge(activity.from || '?', ''), ' → ', badge(activity.to || '?', ''),
+      ]));
+    } else {
+      const body = snippet(activity.body, 400);
+      if (body) {
+        body.className = 'activity-body snippet';
+        children.push(body);
+      }
+    }
+    return el('div', { class: 'activity' }, children);
+  }
+
+  function renderJira(match, issue, error, activity) {
     const url = jiraBrowseUrl(match.key);
     const head = el('div', { class: 'card-head' }, [
       el('a', { class: 'ref', href: url, target: '_blank', rel: 'noreferrer' }, match.key),
@@ -190,7 +213,8 @@
           ['Reporter', fields.reporter?.displayName],
           ['Updated', fmtDate(fields.updated)],
         ]),
-        snippet(typeof fields.description === 'string' ? fields.description : '')
+        snippet(typeof fields.description === 'string' ? fields.description : ''),
+        activitySection(activity)
       );
     } else {
       children.push(el('h2', {}, 'Jira issue'));
@@ -201,7 +225,7 @@
     setCard(el('div', { class: 'card' }, children));
   }
 
-  function renderGithub(match, issue, pull, error) {
+  function renderGithub(match, issue, pull, error, activity) {
     const ref = `${match.owner}/${match.repo}#${match.number}`;
     const url = pull?.html_url || issue?.html_url || match.url;
 
@@ -242,7 +266,8 @@
         labels.length
           ? el('div', { class: 'labels' }, labels.map((l) => coloredLabelChip(l.name, l.color)))
           : null,
-        snippet(data.body || '')
+        snippet(data.body || ''),
+        activitySection(activity)
       );
     } else {
       children.push(el('h2', {}, 'GitHub reference'));
@@ -321,6 +346,79 @@
 
   const JIRA_FIELDS = 'summary,status,assignee,reporter,priority,issuetype,updated,description';
 
+  /* --------------------- latest comment / status update ------------------ */
+
+  // Newest Jira comment. Two requests so it works on Cloud and Server alike
+  // (Server ignores orderBy): probe the total, then fetch the last one.
+  async function fetchLatestJiraComment(base, key) {
+    const commentUrl = `${base}/rest/api/2/issue/${encodeURIComponent(key)}/comment`;
+    const probe = await fetchJson(`${commentUrl}?maxResults=0`, jiraAuthHeaders());
+    const total = probe.total || 0;
+    if (!total) return null;
+    const page = await fetchJson(
+      `${commentUrl}?startAt=${total - 1}&maxResults=1`,
+      jiraAuthHeaders()
+    );
+    const c = (page.comments || [])[0];
+    if (!c) return null;
+    return {
+      type: 'comment',
+      author: c.author?.displayName,
+      at: c.created,
+      body: typeof c.body === 'string' ? c.body : '',
+    };
+  }
+
+  // Newest status transition from the issue changelog (fetched via
+  // expand=changelog on the issue itself, so it costs no extra request).
+  function latestJiraStatusChange(issue) {
+    let latest = null;
+    for (const history of issue.changelog?.histories || []) {
+      const item = (history.items || []).find((it) => it.field === 'status');
+      if (!item) continue;
+      if (!latest || new Date(history.created) > new Date(latest.at)) {
+        latest = {
+          type: 'status',
+          author: history.author?.displayName,
+          at: history.created,
+          from: item.fromString,
+          to: item.toString,
+        };
+      }
+    }
+    return latest;
+  }
+
+  async function fetchJiraActivity(base, key, issue) {
+    let comment = null;
+    try {
+      comment = await fetchLatestJiraComment(base, key);
+    } catch { /* comments may need extra permissions; skip */ }
+    const status = latestJiraStatusChange(issue);
+    if (comment && status) {
+      return new Date(comment.at) >= new Date(status.at) ? comment : status;
+    }
+    return comment || status;
+  }
+
+  // Newest GitHub issue/PR comment: with per_page=1 (ascending), the page
+  // number equal to the comment count holds the newest comment.
+  async function fetchLatestGithubComment(apiBase, number, count) {
+    if (!count) return null;
+    const arr = await fetchJson(
+      `${apiBase}/issues/${number}/comments?per_page=1&page=${count}`,
+      githubAuthHeaders()
+    );
+    const c = Array.isArray(arr) ? arr[arr.length - 1] : null;
+    if (!c) return null;
+    return {
+      type: 'comment',
+      author: c.user?.login,
+      at: c.created_at,
+      body: c.body || '',
+    };
+  }
+
   async function showJira(match, seq) {
     const base = (config?.jira?.baseUrl || '').replace(/\/+$/, '');
     if (!base || base.includes('jira.example.com')) {
@@ -332,7 +430,7 @@
     const cached = await cacheGet(cacheKey);
     if (seq !== requestSeq) return;
     if (cached) {
-      renderJira(match, cached.issue, null);
+      renderJira(match, cached.issue, null, cached.activity);
       setStatus(`${match.raw} · cached from ${fmtDate(cached.cachedAt)} · refreshing…`);
     } else {
       renderJira(match, null, null);
@@ -340,14 +438,17 @@
 
     try {
       const issue = await fetchJson(
-        `${base}/rest/api/2/issue/${encodeURIComponent(match.key)}?fields=${JIRA_FIELDS}`,
+        `${base}/rest/api/2/issue/${encodeURIComponent(match.key)}?fields=${JIRA_FIELDS}&expand=changelog`,
         jiraAuthHeaders()
       );
+      const activity = await fetchJiraActivity(base, match.key, issue);
+      delete issue.changelog; // only needed for activity; keep cache entries slim
       if (seq !== requestSeq) return;
-      if (!cached || !samePayload(cached.issue, issue)) {
-        renderJira(match, issue, null);
+      if (!cached || !samePayload({ issue: cached.issue, activity: cached.activity ?? null },
+                                  { issue, activity: activity ?? null })) {
+        renderJira(match, issue, null, activity);
         setStatus(`${match.raw} · updated ${new Date().toLocaleTimeString()}`);
-        await cacheSet(cacheKey, { issue });
+        await cacheSet(cacheKey, { issue, activity: activity ?? null });
       } else {
         setStatus(`${match.raw} · up to date`);
       }
@@ -366,7 +467,7 @@
     const cached = await cacheGet(cacheKey);
     if (seq !== requestSeq) return;
     if (cached) {
-      renderGithub(match, cached.issue, cached.pull, null);
+      renderGithub(match, cached.issue, cached.pull, null, cached.activity);
       setStatus(`${match.raw} · cached from ${fmtDate(cached.cachedAt)} · refreshing…`);
     } else {
       renderGithub(match, null, null, null);
@@ -382,11 +483,18 @@
           pull = await fetchJson(`${apiBase}/pulls/${match.number}`, githubAuthHeaders());
         } catch { /* fall back to issue data */ }
       }
+      let activity = null;
+      try {
+        activity = await fetchLatestGithubComment(apiBase, match.number, issue.comments);
+      } catch { /* comments are optional */ }
       if (seq !== requestSeq) return;
-      if (!cached || !samePayload({ issue: cached.issue, pull: cached.pull }, { issue, pull })) {
-        renderGithub(match, issue, pull, null);
+      if (!cached || !samePayload(
+        { issue: cached.issue, pull: cached.pull, activity: cached.activity ?? null },
+        { issue, pull, activity: activity ?? null }
+      )) {
+        renderGithub(match, issue, pull, null, activity);
         setStatus(`${match.raw} · updated ${new Date().toLocaleTimeString()}`);
-        await cacheSet(cacheKey, { issue, pull });
+        await cacheSet(cacheKey, { issue, pull, activity: activity ?? null });
       } else {
         setStatus(`${match.raw} · up to date`);
       }
