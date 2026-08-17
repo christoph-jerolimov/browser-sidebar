@@ -1,6 +1,6 @@
 {
   "jira": {
-    "baseUrl": "https://jira.example.com",
+    "baseUrl": "https://redhat.atlassian.net",
     "issuePath": "/browse/",
     "projectKeys": [],
     "email": "",
