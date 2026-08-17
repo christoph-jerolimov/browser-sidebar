@@ -262,6 +262,50 @@
     ]));
   }
 
+  /* ------------------------------- cache --------------------------------- */
+
+  // Last fetched payload per ticket, so a revisited ticket renders instantly
+  // from cache while a fresh fetch runs in the background.
+  const CACHE_STORAGE_KEY = 'ticketCache';
+  const CACHE_MAX_ENTRIES = 50;
+
+  async function cacheGet(key) {
+    const store = (await api.storage.local.get({ [CACHE_STORAGE_KEY]: {} }))[CACHE_STORAGE_KEY];
+    return store[key] || null;
+  }
+
+  async function cacheSet(key, payload) {
+    const store = (await api.storage.local.get({ [CACHE_STORAGE_KEY]: {} }))[CACHE_STORAGE_KEY];
+    store[key] = { ...payload, cachedAt: Date.now() };
+    const keys = Object.keys(store);
+    if (keys.length > CACHE_MAX_ENTRIES) {
+      keys.sort((a, b) => (store[a].cachedAt || 0) - (store[b].cachedAt || 0));
+      for (const stale of keys.slice(0, keys.length - CACHE_MAX_ENTRIES)) delete store[stale];
+    }
+    await api.storage.local.set({ [CACHE_STORAGE_KEY]: store });
+  }
+
+  // storage.local may reorder object keys on round-trip, so compare with a
+  // canonical (key-sorted) serialization.
+  function stableStringify(value) {
+    if (Array.isArray(value)) {
+      return `[${value.map(stableStringify).join(',')}]`;
+    }
+    if (value && typeof value === 'object') {
+      const body = Object.keys(value)
+        .sort()
+        .filter((k) => value[k] !== undefined)
+        .map((k) => `${JSON.stringify(k)}:${stableStringify(value[k])}`)
+        .join(',');
+      return `{${body}}`;
+    }
+    return JSON.stringify(value) ?? 'null';
+  }
+
+  function samePayload(a, b) {
+    return stableStringify(a) === stableStringify(b);
+  }
+
   /* ------------------------------ fetchers ------------------------------- */
 
   async function fetchJson(url, headers) {
@@ -275,26 +319,59 @@
     return res.json();
   }
 
+  const JIRA_FIELDS = 'summary,status,assignee,reporter,priority,issuetype,updated,description';
+
   async function showJira(match, seq) {
     const base = (config?.jira?.baseUrl || '').replace(/\/+$/, '');
     if (!base || base.includes('jira.example.com')) {
       renderJira(match, null, 'Set jira.baseUrl in config.json to fetch details.');
       return;
     }
-    renderJira(match, null, null);
+
+    const cacheKey = `jira:${base}:${match.key}`;
+    const cached = await cacheGet(cacheKey);
+    if (seq !== requestSeq) return;
+    if (cached) {
+      renderJira(match, cached.issue, null);
+      setStatus(`${match.raw} · cached from ${fmtDate(cached.cachedAt)} · refreshing…`);
+    } else {
+      renderJira(match, null, null);
+    }
+
     try {
       const issue = await fetchJson(
-        `${base}/rest/api/2/issue/${encodeURIComponent(match.key)}`,
+        `${base}/rest/api/2/issue/${encodeURIComponent(match.key)}?fields=${JIRA_FIELDS}`,
         jiraAuthHeaders()
       );
-      if (seq === requestSeq) renderJira(match, issue, null);
+      if (seq !== requestSeq) return;
+      if (!cached || !samePayload(cached.issue, issue)) {
+        renderJira(match, issue, null);
+        setStatus(`${match.raw} · updated ${new Date().toLocaleTimeString()}`);
+        await cacheSet(cacheKey, { issue });
+      } else {
+        setStatus(`${match.raw} · up to date`);
+      }
     } catch (e) {
-      if (seq === requestSeq) renderJira(match, null, `Could not fetch issue: ${e.message}`);
+      if (seq !== requestSeq) return;
+      if (cached) {
+        setStatus(`${match.raw} · showing cached data (refresh failed: ${e.message})`);
+      } else {
+        renderJira(match, null, `Could not fetch issue: ${e.message}`);
+      }
     }
   }
 
   async function showGithub(match, seq) {
-    renderGithub(match, null, null, null);
+    const cacheKey = `github:${match.owner}/${match.repo}#${match.number}`;
+    const cached = await cacheGet(cacheKey);
+    if (seq !== requestSeq) return;
+    if (cached) {
+      renderGithub(match, cached.issue, cached.pull, null);
+      setStatus(`${match.raw} · cached from ${fmtDate(cached.cachedAt)} · refreshing…`);
+    } else {
+      renderGithub(match, null, null, null);
+    }
+
     const apiBase = `https://api.github.com/repos/${match.owner}/${match.repo}`;
     try {
       // The issues endpoint answers for both issues and PRs.
@@ -305,9 +382,21 @@
           pull = await fetchJson(`${apiBase}/pulls/${match.number}`, githubAuthHeaders());
         } catch { /* fall back to issue data */ }
       }
-      if (seq === requestSeq) renderGithub(match, issue, pull, null);
+      if (seq !== requestSeq) return;
+      if (!cached || !samePayload({ issue: cached.issue, pull: cached.pull }, { issue, pull })) {
+        renderGithub(match, issue, pull, null);
+        setStatus(`${match.raw} · updated ${new Date().toLocaleTimeString()}`);
+        await cacheSet(cacheKey, { issue, pull });
+      } else {
+        setStatus(`${match.raw} · up to date`);
+      }
     } catch (e) {
-      if (seq === requestSeq) renderGithub(match, null, null, `Could not fetch: ${e.message}`);
+      if (seq !== requestSeq) return;
+      if (cached) {
+        setStatus(`${match.raw} · showing cached data (refresh failed: ${e.message})`);
+      } else {
+        renderGithub(match, null, null, `Could not fetch: ${e.message}`);
+      }
     }
   }
 

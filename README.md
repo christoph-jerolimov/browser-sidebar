@@ -33,6 +33,10 @@ If you edit a shared file, copy it to the other folder too.
   (Jira: `/rest/api/2/issue/KEY`, GitHub: `api.github.com`), and renders a
   card with title, status, assignee, labels, etc., plus a link to open the
   original page in a tab.
+- Fetched tickets are cached (last 50, in extension storage): revisiting a
+  ticket renders the latest known information instantly, while a fresh fetch
+  runs in the background and updates the card only if something changed
+  (the status line shows "cached … refreshing", then "updated"/"up to date").
 - **Follow / Pause**: the button in the sidebar header toggles whether the
   sidebar follows your selection. The state is shared between the content
   script and the sidebar via storage.
