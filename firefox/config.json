@@ -1,0 +1,13 @@
+{
+  "jira": {
+    "baseUrl": "https://jira.example.com",
+    "issuePath": "/browse/",
+    "projectKeys": [],
+    "email": "",
+    "apiToken": "",
+    "personalAccessToken": ""
+  },
+  "github": {
+    "token": ""
+  }
+}
