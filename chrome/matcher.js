@@ -71,5 +71,24 @@
     return null;
   }
 
-  global.__sidebarMatcher = { findMatch };
+  /*
+   * Find ALL matches in the text (in precedence order, deduplicated by raw
+   * value). Works by repeatedly taking the first match and removing its raw
+   * text before searching again.
+   */
+  function findAllMatches(text, limit = 20) {
+    const matches = [];
+    let remaining = String(text || '');
+    while (matches.length < limit) {
+      const match = findMatch(remaining);
+      if (!match) break;
+      if (!matches.some((m) => m.raw === match.raw)) {
+        matches.push(match);
+      }
+      remaining = remaining.split(match.raw).join(' ');
+    }
+    return matches;
+  }
+
+  global.__sidebarMatcher = { findMatch, findAllMatches };
 })(globalThis);

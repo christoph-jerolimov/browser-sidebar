@@ -80,6 +80,31 @@ header h1 {
   min-height: 20px;
 }
 
+#alts {
+  padding: 0 12px 6px;
+}
+
+.alt-chip {
+  display: inline-block;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  border-radius: 10px;
+  padding: 1px 8px;
+  margin: 0 4px 4px 0;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.alt-chip:hover { border-color: var(--accent); }
+
+.alt-chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
 main {
   flex: 1;
   padding: 4px 12px 12px;

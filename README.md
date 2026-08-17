@@ -39,12 +39,17 @@ If you edit a shared file, copy it to the other folder too.
 - The input field at the bottom of the sidebar lets you test a key/URL
   manually without touching a Google Doc.
 
-What gets detected (first match wins):
+What gets detected (in precedence order):
 
 1. GitHub URLs: `https://github.com/o/r/pull/123` (also `/pulls/`, `/issues/`)
-2. Jira keys: `ABC-1234`
+2. Jira keys: `ABC-1234` (any `PROJECT-123`-shaped key reacts; narrow it with
+   `projectKeys` in `config.json` if needed)
 3. GitHub shorthand: `owner/repo#123`
 4. Any other `http(s)` URL → shown as a plain link card
+
+If the selection contains **several** tickets (e.g. `ABC-1234, DEF-56 and
+XYZ-7`), the first one becomes the card and the rest appear as clickable
+"Also detected" chips above it, so you can flip between all of them.
 
 ## Configuration (`config.json`)
 

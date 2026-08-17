@@ -22,8 +22,10 @@
   const POLL_MS = 500;
   const MAX_SELECTION_LENGTH = 2000;
 
+  const MAX_ALTERNATES = 8;
+
   let following = true;
-  let lastRaw = '';
+  let lastSignature = '';
 
   api.storage.local.get({ following: true }).then((v) => {
     following = v.following;
@@ -77,24 +79,34 @@
   function tick() {
     if (!following) return;
 
-    let match = null;
+    let matches = [];
 
     const link = readLinkUnderCursor();
     if (link) {
-      match = globalThis.__sidebarMatcher.findMatch(link);
+      matches = globalThis.__sidebarMatcher.findAllMatches(link);
     }
 
-    if (!match) {
+    if (!matches.length) {
       const selection = readSelectionText();
       if (selection && selection.length <= MAX_SELECTION_LENGTH) {
-        match = globalThis.__sidebarMatcher.findMatch(selection);
+        matches = globalThis.__sidebarMatcher.findAllMatches(selection);
       }
     }
 
-    if (match && match.raw !== lastRaw) {
-      lastRaw = match.raw;
+    if (!matches.length) return;
+
+    // First match becomes the card; further Jira/GitHub matches are offered
+    // as clickable alternates in the sidebar.
+    const [primary, ...rest] = matches;
+    const alternates = rest
+      .filter((m) => m.kind === 'jira' || m.kind === 'github')
+      .slice(0, MAX_ALTERNATES);
+
+    const signature = [primary, ...alternates].map((m) => m.raw).join('|');
+    if (signature !== lastSignature) {
+      lastSignature = signature;
       api.storage.local.set({
-        lastMatch: { ...match, at: Date.now(), source: 'google-docs' },
+        lastMatch: { ...primary, alternates, at: Date.now(), source: 'google-docs' },
       });
     }
   }
